@@ -41,8 +41,15 @@ npm start
 - `/queue`
 
 ## 참고
-
 YouTube 재생은 yt-dlp CLI로 실제 오디오 URL을 추출한 뒤, DisTube DirectLinkPlugin으로 재생하는 구조입니다.
+
+
+## Ollama Local LLM (AI)
+```
+irm https://ollama.com/install.ps1 | iex
+ollama pull qwen2.5:7b
+```
+
 
 ## 초대링크
 https://discord.com/oauth2/authorize?client_id=536860675310354443&permissions=8&integration_type=0&scope=bot
