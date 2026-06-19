@@ -1,0 +1,19 @@
+{
+  "name": "discord-miku-music-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "latest",
+    "@distube/direct-link": "latest",
+    "discord.js": "latest",
+    "distube": "latest",
+    "dotenv": "latest",
+    "ffmpeg-static": "latest",
+    "opusscript": "latest",
+    "yt-search": "latest"
+  }
+}
