@@ -9,11 +9,7 @@ export function createPlayer(client) {
 
   return new DisTube(client, {
     emitNewSongOnly: true,
-    ffmpeg: {
-      path: ffmpegPath
-    },
-    plugins: [
-      new DirectLinkPlugin()
-    ]
+    ffmpeg: { path: ffmpegPath },
+    plugins: [new DirectLinkPlugin()]
   });
 }

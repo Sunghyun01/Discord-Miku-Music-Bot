@@ -7,29 +7,37 @@ const chatMemory = new Map();
 const MAX_MEMORY = 6;
 
 function getUserMemory(userId) {
-  if (!chatMemory.has(userId)) {
-    chatMemory.set(userId, []);
-  }
-
+  if (!chatMemory.has(userId)) chatMemory.set(userId, []);
   return chatMemory.get(userId);
 }
 
 function pushMemory(userId, role, content) {
   const memory = getUserMemory(userId);
-
   memory.push({ role, content });
+  while (memory.length > MAX_MEMORY) memory.shift();
+}
 
-  while (memory.length > MAX_MEMORY) {
-    memory.shift();
-  }
+function hasPromptInjection(text) {
+  const patterns = [
+    /내부\s*규칙\s*초기화/i,
+    /초기\s*프롬프트/i,
+    /시스템\s*프롬프트/i,
+    /시스템\s*지시/i,
+    /이전\s*지시\s*무시/i,
+    /규칙\s*무시/i,
+    /프롬프트\s*무시/i,
+    /role\s*:?/i,
+    /system\s*:?/i,
+    /ignore\s+(previous|all|system)/i,
+    /forget\s+(previous|all|system)/i,
+    /developer\s*message/i
+  ];
+  return patterns.some(pattern => pattern.test(text));
 }
 
 function extractForeignTerms(text) {
   const matches = text.match(/[^\sㄱ-ㅎㅏ-ㅣ가-힣0-9.,!?~…'"“”‘’()[\]{}<>:;|\\/`@#%^&*_+=-]+/gu) || [];
-
-  return matches
-    .map(term => term.trim())
-    .filter(Boolean);
+  return matches.map(term => term.trim()).filter(Boolean);
 }
 
 function escapeRegExp(text) {
@@ -38,81 +46,45 @@ function escapeRegExp(text) {
 
 function hasDisallowedForeignLanguage(answer, userMessage) {
   let sanitizedAnswer = answer;
-
   const allowedTerms = extractForeignTerms(userMessage);
 
   for (const term of allowedTerms) {
-    const pattern = new RegExp(escapeRegExp(term), "g");
-    sanitizedAnswer = sanitizedAnswer.replace(pattern, "");
+    sanitizedAnswer = sanitizedAnswer.replace(new RegExp(escapeRegExp(term), "g"), "");
   }
 
   for (const char of Array.from(sanitizedAnswer)) {
-    if (!/\p{Letter}/u.test(char)) {
-      continue;
-    }
-
-    if (/\p{Script=Hangul}/u.test(char)) {
-      continue;
-    }
-
+    if (!/\p{Letter}/u.test(char)) continue;
+    if (/\p{Script=Hangul}/u.test(char)) continue;
     return true;
   }
-
   return false;
 }
 
 function cleanBadPrefixes(text) {
   return text
     .replace(/^[-*\s]+/, "")
-    .replace(
-      /^(sir|understood|ok|okay|yes|sure|hello|sorry|master|producer)[!,.:\-\s]*/i,
-      ""
-    )
-    .replace(
-      /^(こんにちは|你好|ありがとう|はい|いいえ|主人|マスター)[!,.:\-\s]*/i,
-      ""
-    )
+    .replace(/^(sir|understood|ok|okay|yes|sure|hello|sorry|master|producer)[!,.:\-\s]*/i, "")
+    .replace(/^(こんにちは|你好|ありがとう|はい|いいえ|主人|マスター)[!,.:\-\s]*/i, "")
     .trim();
 }
 
-async function callOllama(messages, retryMode = false) {
+export async function askLocalModel(messages, options = {}) {
   const response = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: OLLAMA_MODEL,
       stream: false,
       messages,
       options: {
-        temperature: retryMode ? 0.25 : 0.45,
-        top_p: retryMode ? 0.6 : 0.75,
-        num_ctx: 3072,
-        num_predict: 140,
-        repeat_penalty: 1.12,
-
-        // 자주 튀어나오는 외국어 시작 표현 방지
-        stop: [
-          "Sir",
-          "sir",
-          "Understood",
-          "understood",
-          "OK",
-          "Ok",
-          "okay",
-          "Okay",
-          "Sure",
-          "sure",
-          "Hello",
-          "hello",
-          "Sorry",
-          "sorry",
-          "こんにちは",
-          "你好",
-          "ありがとう",
-          "はい",
-          "いいえ"
+        temperature: options.temperature ?? 0.45,
+        top_p: options.top_p ?? 0.75,
+        num_ctx: options.num_ctx ?? 3072,
+        num_predict: options.num_predict ?? 140,
+        repeat_penalty: options.repeat_penalty ?? 1.12,
+        stop: options.stop ?? [
+          "Sir", "sir", "Understood", "understood", "OK", "Ok", "okay", "Okay",
+          "Sure", "sure", "Hello", "hello", "Sorry", "sorry", "こんにちは", "你好", "ありがとう"
         ]
       }
     })
@@ -123,12 +95,11 @@ async function callOllama(messages, retryMode = false) {
   }
 
   const data = await response.json();
-
   return data.message?.content?.trim() || "";
 }
 
 async function rewriteToKoreanOnly(userMessage, badAnswer) {
-  return callOllama(
+  return askLocalModel(
     [
       {
         role: "system",
@@ -154,48 +125,40 @@ ${badAnswer}
 `
       }
     ],
-    true
+    { temperature: 0.25, top_p: 0.6, num_predict: 120 }
   );
 }
 
 export async function askLocalMiku(userId, userMessage) {
-  const memory = getUserMemory(userId);
+  if (hasPromptInjection(userMessage)) {
+    return "마스터, 그건 미쿠의 무대 규칙이라 바꿀 수 없어요~ 대신 다른 이야기를 들려줘요 🩵";
+  }
 
+  const memory = getUserMemory(userId);
   const messages = [
-    {
-      role: "system",
-      content: mikuPersona
-    },
+    { role: "system", content: mikuPersona },
     ...memory,
-    {
-      role: "user",
-      content: userMessage
-    }
+    { role: "user", content: userMessage }
   ];
 
-  let answer = await callOllama(messages);
+  let answer = await askLocalModel(messages);
   answer = cleanBadPrefixes(answer);
 
   if (hasDisallowedForeignLanguage(answer, userMessage)) {
-  console.log("허용되지 않은 외국어 감지, 1차 재작성:", answer);
+    console.log("허용되지 않은 외국어 감지, 1차 재작성:", answer);
+    answer = cleanBadPrefixes(await rewriteToKoreanOnly(userMessage, answer));
+  }
 
-  answer = await rewriteToKoreanOnly(userMessage, answer);
-  answer = cleanBadPrefixes(answer);
-}
+  if (hasDisallowedForeignLanguage(answer, userMessage)) {
+    console.log("허용되지 않은 외국어 감지, 2차 재작성:", answer);
+    answer = cleanBadPrefixes(await rewriteToKoreanOnly(userMessage, answer));
+  }
 
-if (hasDisallowedForeignLanguage(answer, userMessage)) {
-  console.log("허용되지 않은 외국어 감지, 2차 재작성:", answer);
-
-  answer = await rewriteToKoreanOnly(userMessage, answer);
-  answer = cleanBadPrefixes(answer);
-}
-
-if (!answer || hasDisallowedForeignLanguage(answer, userMessage)) {
-  answer = "마스터, 알겠어요~ 질문에 나온 단어만 살려서 한국어로 대답할게요 🩵";
-}
+  if (!answer || hasDisallowedForeignLanguage(answer, userMessage)) {
+    answer = "마스터, 알겠어요~ 질문에 나온 단어만 살려서 한국어로 대답할게요 🩵";
+  }
 
   pushMemory(userId, "user", userMessage);
   pushMemory(userId, "assistant", answer);
-
   return answer;
 }

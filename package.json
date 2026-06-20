@@ -12,6 +12,7 @@
     "discord.js": "latest",
     "distube": "latest",
     "dotenv": "latest",
+    "express": "^5.2.1",
     "ffmpeg-static": "latest",
     "opusscript": "latest",
     "yt-search": "latest"
