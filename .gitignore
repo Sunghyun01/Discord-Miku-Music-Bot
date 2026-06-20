@@ -100,6 +100,10 @@ dist
 .svelte-kit
 
 # miku bot setup
-data/guilds/
+data/guilds/*
+
+# temp 폴더는 예외로 추적
+!data/guilds/temp/
+!data/guilds/temp/**
 
 # End of https://www.toptal.com/developers/gitignore/api/node
