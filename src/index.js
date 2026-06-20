@@ -33,7 +33,11 @@ const distube = createPlayer(client);
 
 client.once(Events.ClientReady, readyClient => {
     console.log(msg.ready(readyClient.user.tag));
-    client.user.setActivity("음악 대기 중이에요 🎧", { type: ActivityType.Listening });
+
+    client.user.setActivity("음악 대기 중이에요 🎧", {
+        type: ActivityType.Listening
+    });
+
     startDashboard(client, distube);
 });
 
@@ -45,7 +49,41 @@ client.on(Events.InteractionCreate, async interaction => {
             return;
         }
 
-        await handleMusicCommand(interaction, distube, client);
+        const handledButton = await handleButtonInteraction(interaction, distube, client);
+
+        if (handledButton) {
+            return;
+        }
+
+        const handledMusic = await handleMusicCommand(interaction, distube, client);
+
+        if (handledMusic) {
+            return;
+        }
+
+        const handledFavorite = await handleFavoriteCommand(interaction, distube);
+
+        if (handledFavorite) {
+            return;
+        }
+
+        const handledPlaylist = await handlePlaylistCommand(interaction, distube);
+
+        if (handledPlaylist) {
+            return;
+        }
+
+        const handledRecommend = await handleRecommendCommand(interaction);
+
+        if (handledRecommend) {
+            return;
+        }
+
+        const handledSettings = await handleSettingsCommand(interaction);
+
+        if (handledSettings) {
+            return;
+        }
     } catch (error) {
         console.error("명령어 처리 오류:", error);
 
@@ -70,6 +108,8 @@ client.on(Events.MessageCreate, async message => {
     }
 });
 
-registerPlayerEvents(distube, client, guildId => handleAutoDjFinish(distube, client, guildId));
+registerPlayerEvents(distube, client, guildId =>
+    handleAutoDjFinish(distube, client, guildId)
+);
 
 client.login(process.env.DISCORD_TOKEN);
