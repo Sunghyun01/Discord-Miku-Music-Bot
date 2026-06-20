@@ -99,4 +99,7 @@ dist
 # SvelteKit build / generate output
 .svelte-kit
 
+# miku bot setup
+data/guilds/
+
 # End of https://www.toptal.com/developers/gitignore/api/node
