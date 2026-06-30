@@ -1,4 +1,5 @@
 #  <img src="./img/logo.png"  width="30" height="30"/>  Discord Miku Music Bot
+<img src="./img/background.png">
 
 > 음악을 틀어주고, AI DJ 멘트도 해주고, 별점까지 매겨주는  
 > 귀여운 미쿠풍 디스코드 음악봇이에요 🩵✨
